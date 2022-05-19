@@ -1,5 +1,5 @@
-#### Název souboru : gui_aplikace.py
-#### Popis programu: vzorová aplikace v tkinter psaná objektově
+#### Název souboru : pong.py
+#### Popis programu: pong hra
 #### Autor:  Alex Michaud
 ############################################################################
 ####### MODULY
@@ -21,14 +21,15 @@ class Palka(object):
         self.barva = barva
         self.id = self.platno.obdelnik(x, y, s, v, vypln=barva, barva=barva)
         self.rychlost = rychlost
+        self.score = 0
 
     def krok(self):
         """
          pálka se posune ve směru vektoru rychlosti o jeden krok
         """
-        self.x += self.rychlost[0]
-        self.y += self.rychlost[1]
-        self.platno.move(self.id, self.rychlost[0], self.rychlost[1])
+        self.x = self.x + self.rychlost[0]
+        self.y = self.y + self.rychlost[1]
+        self.platno.moveto(self.id, self.x, self.y)
 
     def set_rychlost(self, rychlost):
         """
@@ -49,6 +50,11 @@ class Palka(object):
         """
         return self.x, self.y
 
+    def get_score(self):
+        return self.score
+
+    def score_up(self):
+        self.score += 1
 
 class Micek(object):
     """
@@ -78,10 +84,17 @@ class Micek(object):
         return self.x, self.y
 
     def odrazX(self):
-        self.rychlost[0] = self.rychlost[0] * -1
+        self.rychlost[0] = -self.rychlost[0]
 
     def odrazY(self):
-        self.rychlost[1] = self.rychlost[1] * -1
+        self.rychlost[1] = -self.rychlost[1]
+
+    def start(self,x, y):
+        self.rychlost[0] *= -1
+        self.rychlost[1] *= -1
+        self.x = x
+        self.y = y
+        self.platno.moveto(self.id, x - self.r, y - self.r)
 
 
 class Platno(tk.Canvas):
@@ -110,7 +123,7 @@ class Platno(tk.Canvas):
             obrys ... síla obrysu v pixelech
         Funkce vrací číslo objektu na canvasu - tj. stejnou hodnotu jako metoda create_oval()
         """
-        return self.create_oval(x - r / 2, y - r / 2, x + r / 2, y + r / 2, fill=vypln, outline=barva, width=obrys)
+        return self.create_oval(x - r, y - r, x + r, y + r, fill=vypln, outline=barva, width=obrys)
 
     def presun(self, objekt, new_x, new_y):
         """
@@ -141,7 +154,7 @@ class App(tk.Tk):
         self.W = sirka  # šířka okna
         self.H = vyska  # výška okna
         self.titulek = titulek  # titulek okna
-        self.title(titulek)  ##### vlastní nastavení titulku okna
+          ##### vlastní nastavení titulku okna
         self.geometry(f"{self.W}x{self.H}+1200+200")  # nastavení velikosti a polohy okna
         ### vložení widgetů do okna
         #####
@@ -151,20 +164,28 @@ class App(tk.Tk):
         #### vykreslení prvků na plátno
         ## nakreslení pálky
         self.palka = Palka(self.canvas, 10, 100, 20, 50, "blue", [0, 0])
+        ## nakreslení palky 2
+        self.palka_2 = Palka(self.canvas, self.W - 30, self.H /2, 20, 50, "blue", [0, 0])
         ## nakreslení míčku
-        self.micek = Micek(self.canvas, 30, 40, 20, "yellow", [1, 1])
+        self.micek = Micek(self.canvas, 30, 40, 10, "yellow", [1, 1])
         ## nakreslení nápisu
-        self.napis = self.canvas.create_text(20, 20, text="00", font="Arial 20 bold", anchor=tk.W)
+
+        #vytvoření textu
+        self.text = self.canvas.create_text(self.W/2, 30, text="00:00", font="Arial 20 bold")
         ### navazani udalostí na obsluhy
         # vazby pro celý canvas
         self.canvas.bind("<KeyPress-Up>", self.palka_up)
         self.canvas.bind("<KeyPress-Down>", self.palka_down)
         self.canvas.bind("<KeyRelease-Up>", self.palka_stop)
         self.canvas.bind("<KeyRelease-Down>", self.palka_stop)
-        self.canvas.bind("<KeyPress-w>", self.palka_up)
-        self.canvas.bind("<KeyPress-x>", self.palka_down)
-        self.canvas.bind("<KeyRelease-w>", self.palka_stop)
-        self.canvas.bind("<KeyRelease-x>", self.palka_stop)
+        self.canvas.bind("<KeyPress-w>", self.palka_up2)
+        self.canvas.bind("<KeyPress-s>", self.palka_down2)
+        self.canvas.bind("<KeyRelease-w>", self.palka_stop2)
+        self.canvas.bind("<KeyRelease-s>", self.palka_stop2)
+        self.canvas.bind("q", self.konec)
+        self.canvas.bind("p", self.stop)
+        self.running = True
+
         self.canvas.focus_set()  # nastavení canvasu jako příjemce událostí stisků klávesy
         ### spuštění časovače pro posun kolečka
         self.after(20, self.udelej_krok)
@@ -177,17 +198,22 @@ class App(tk.Tk):
         ##### Hlavní smyčka Tk (čekání na události)
         self.mainloop()
 
+    def konec(self, udalost):
+        self.destroy()
+
+    def stop(self, udalost):
+        self.running = not self.running
+
     ###################################################
     def udelej_krok(self):
         """
          posun  micku a palky o jeden krok ve směru vektoru rychlosti daného objektu
         """
-        x, y = self.micek.get_pos()     #získání pozice míčku
-        if x + (1/2*self.micek.r) >= self.W or x - (1/2*self.micek.r)<= 0:      #zkontrolování jestli míček neprojel x
-            self.odraz_x()  #odražení míčku
-        if y + (1/2*self.micek.r) >= self.H or y - (1/2*self.micek.r)<= 0:      #zkontrolování jestli míček neprojel y
-            self.odraz_y()  #odražení míčku
-        self.micek.krok()
+        #### test behu animace
+        if not self.running:
+            self.after(10, self.udelej_krok)
+            return
+
         px, py = self.palka.get_pos()
         if (py <= 0) or (py >= self.H):
             self.palka.otoc()
@@ -195,7 +221,46 @@ class App(tk.Tk):
             self.palka.krok()
         else:
             self.palka.krok()
-        self.after(20, self.udelej_krok)
+
+
+
+        px_1, py_1 = self.palka_2.get_pos()
+        if (py_1 <= 0) or (py_1 >= self.H):
+            self.palka_2.otoc()
+            self.palka_2.krok()
+            self.palka_2.krok()
+        else:
+            self.palka_2.krok()
+        #### micek
+        self.micek.krok()
+        mx, my = self.micek.get_pos()
+        ### horní a dolní
+        if (my <= self.micek.r) or (my >= (self.H - self.micek.r)):
+            self.micek.odrazY()
+        ### prava
+        if (mx >= (self.W - self.micek.r)):
+            self.palka.score_up()
+            self.micek.start(self.H/2, self.W/2)
+            self.canvas.itemconfig(self.text, text=f"{self.palka.score:02d}:{self.palka_2.score:02d}")
+
+            pass
+        ### leva
+        if (mx <= self.micek.r):
+            self.palka_2.score_up()
+            self.micek.start(self.H / 2, self.W / 2)
+            self.canvas.itemconfig(self.text, text=f"{self.palka.score:02d}:{self.palka_2.score:02d}")
+
+            pass
+        ### bbox pálky?
+        x1, y1, x2, y2 = self.canvas.bbox(self.palka.id)
+        if self.micek.id in self.canvas.find_overlapping(x1, y1, x2, y2):
+            self.micek.odrazX()
+
+        x3, y3, x4, y4 = self.canvas.bbox(self.palka_2.id)
+        if self.micek.id in self.canvas.find_overlapping(x3, y3, x4, y4):
+            self.micek.odrazX()
+        self.after(10, self.udelej_krok)
+        ######################################
 
     def palka_up(self, udalost):
         self.palka.set_rychlost([0, -5])
@@ -206,11 +271,70 @@ class App(tk.Tk):
     def palka_stop(self, udalost):
         self.palka.set_rychlost([0, 0])
 
-    def odraz_x(self):
-        self.micek.rychlost[0] = self.micek.rychlost[0] * -1        #přenastavení rychlosti ve směru x na opačnou hodnotu
+    def palka_up2(self, udalost):
+        self.palka_2.set_rychlost([0, -5])
 
-    def odraz_y(self):
-        self.micek.rychlost[1] = self.micek.rychlost[1] * -1        #přenastavení rychlosti ve směru x na opačnou hodnotu
+    def palka_down2(self, udalost):
+        self.palka_2.set_rychlost([0, 5])
+
+    def palka_stop2(self, udalost):
+        self.palka_2.set_rychlost([0, 0])
+
+    ############
+    def klik_pravym(self, udalost):
+        """
+           výpis souřadnic na canvase při kliknutí na canvas pravým myším tlačítkem
+        """
+        self.canvas.itemconfig(self.napis, text=f"{udalost.x},{udalost.y}")
+
+    ############
+    def klik_prostrednim(self, udalost):
+        """
+           přesun kolečka na místo kliknutí prostředním tlačítkem
+        """
+        self.canvas.presun(self.kolecko, udalost.x, udalost.y)
+
+    ############
+    def klik_obdelnik(self, udalost):
+        """
+           výpis nápisu "Obdélník" po kliknutí na obdélník
+        """
+        self.canvas.itemconfig(self.napis, text="Obdelník")
+
+    ############
+    def klik_kolecko(self, udalost):
+        """
+           výpis nápisu "Kolečko" po kliknutí na kolečko
+        """
+        self.canvas.itemconfig(self.napis, text="Kolečko")
+
+    ############
+    def kolecko_left(self, udalost):
+        """
+           posun kolecka o -5px v ose x (doleva)
+        """
+        self.canvas.move(self.kolecko, -5, 0)
+
+    ############
+    def kolecko_right(self, udalost):
+        """
+           posun kolecka o +5px v ose x (doprava)
+        """
+        self.canvas.move(self.kolecko, +5, 0)
+
+    ############
+    def obdelnik_left(self, udalost):
+        """
+           posun obdélníku o -5px v ose x (doleva)
+        """
+        self.canvas.move(self.obdelnik, -5, 0)
+
+    ############
+    def obdelnik_right(self, udalost):
+        """
+           posun obdélníku o +5px v ose x (doprava)
+        """
+        self.canvas.move(self.obdelnik, +5, 0)
 
 
 ####################################################################
@@ -222,5 +346,4 @@ if __name__ == "__main__":
     # rozběhneme aplikaci
     app.run()
 #### KONEC SOUBORU
-
 
