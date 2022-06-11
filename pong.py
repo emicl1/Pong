@@ -29,7 +29,9 @@ class Palka(object):
         """
         self.x = self.x + self.rychlost[0]
         self.y = self.y + self.rychlost[1]
-        self.platno.moveto(self.id, self.x, self.y)
+        self.platno.moveto(self.id, self.x, self.y )
+        #self.platno.moveto(self.id, self.x - self.sirka / 2, self.y - self.vyska / 2)
+
 
     def set_rychlost(self, rychlost):
         """
@@ -155,21 +157,44 @@ class App(tk.Tk):
         self.H = vyska  # výška okna
         self.titulek = titulek  # titulek okna
           ##### vlastní nastavení titulku okna
-        self.geometry(f"{self.W}x{self.H}+1200+200")  # nastavení velikosti a polohy okna
+        self.geometry(f"{self.W }x{self.H+60}+1600+400")  # nastavení velikosti a polohy okna
+        self.menubar = tk.Menu(self)
+        #### rolovací menu SOUBOR
+        self.fileMenu = tk.Menu(self.menubar, tearoff=0)
+        #self.fileMenu.add_command(label="Nová hra", command=self.new_game, state=tk.DISABLED)
+        self.fileMenu.add_separator()
+        self.fileMenu.add_command(label="Konec", command=self.konec)
+        #### rolovací menu Nástroje
+        self.setMenu = tk.Menu(self.menubar, tearoff=0)
+        #self.setMenu.add_command(label="Nová hra", command=self.new_game)
+        #### napojení rolovacích menu na hlavní menu okna (menubar)
         ### vložení widgetů do okna
-        #####
+        self.skupinaHorni = tk.Frame(self)
+        self.skupinaDolni = tk.Frame(self)
+        self.skupinaHorni.pack()
+        self.skupinaDolni.pack()
+        ##### NAPIS - widget LABEL
+        self.nadpis = tk.Label(self.skupinaHorni, text="kdo první dostane 3 body vyhrál", background="red", foreground="yellow",
+                               font="Arial 15 bold")
+        self.nadpis.pack(fill=tk.BOTH, side=tk.TOP)
+        ##### CANVAS
         # vložení naší verze canvasu (Platno) do vytvořeného okna aplikace
-        self.canvas = Platno(self, width=self.W, height=self.H, background=barva)
-        self.canvas.pack()  # zobrazení widgetu canvas v okně
+        self.canvas = Platno(self.skupinaHorni, width=self.W, height=self.H, background=barva)
+        self.canvas.pack(side=tk.TOP)  # zobrazení widgetu canvas v okně
+        ##### TLACIKA - widgety
+        self.quitButton = tk.Button(self.skupinaDolni, text="Konec", command=self.konec)
+        self.quitButton.pack(side=tk.LEFT)
+        ################# KRESLIME NA CANVAS
+        ## přerušovaná čára
+        self.cara = self.canvas.create_line(self.W / 2, 0, self.W / 2, self.H, fill="gray", width=5, dash=(30, 10))
         #### vykreslení prvků na plátno
         ## nakreslení pálky
         self.palka = Palka(self.canvas, 10, 100, 20, 50, "blue", [0, 0])
         ## nakreslení palky 2
-        self.palka_2 = Palka(self.canvas, self.W - 30, self.H /2, 20, 50, "blue", [0, 0])
+        self.palka_2 = Palka(self.canvas, self.W - 30, self.H / 2, 20, 50, "blue", [0, 0])
         ## nakreslení míčku
         self.micek = Micek(self.canvas, 30, 40, 10, "yellow", [1, 1])
         ## nakreslení nápisu
-
         #vytvoření textu
         self.text = self.canvas.create_text(self.W/2, 30, text="00:00", font="Arial 20 bold")
         ### navazani udalostí na obsluhy
@@ -182,13 +207,13 @@ class App(tk.Tk):
         self.canvas.bind("<KeyPress-s>", self.palka_down2)
         self.canvas.bind("<KeyRelease-w>", self.palka_stop2)
         self.canvas.bind("<KeyRelease-s>", self.palka_stop2)
-        self.canvas.bind("q", self.konec)
+        self.canvas.bind("q", self.konec_2)
         self.canvas.bind("p", self.stop)
         self.running = True
-
         self.canvas.focus_set()  # nastavení canvasu jako příjemce událostí stisků klávesy
         ### spuštění časovače pro posun kolečka
         self.after(20, self.udelej_krok)
+
 
     ###################################################
     def run(self):
@@ -198,13 +223,20 @@ class App(tk.Tk):
         ##### Hlavní smyčka Tk (čekání na události)
         self.mainloop()
 
-    def konec(self, udalost):
+    def konec(self):
+        self.destroy()
+
+    def konec_2(self, udalost):
         self.destroy()
 
     def stop(self, udalost):
         self.running = not self.running
 
-    ###################################################
+    def stop_2(self):
+        self.running = not self.running
+
+###################################################
+
     def udelej_krok(self):
         """
          posun  micku a palky o jeden krok ve směru vektoru rychlosti daného objektu
@@ -212,6 +244,7 @@ class App(tk.Tk):
         #### test behu animace
         if not self.running:
             self.after(10, self.udelej_krok)
+            self.canvas.delete(self.palka)
             return
 
         px, py = self.palka.get_pos()
@@ -221,9 +254,6 @@ class App(tk.Tk):
             self.palka.krok()
         else:
             self.palka.krok()
-
-
-
         px_1, py_1 = self.palka_2.get_pos()
         if (py_1 <= 0) or (py_1 >= self.H):
             self.palka_2.otoc()
@@ -260,6 +290,20 @@ class App(tk.Tk):
         if self.micek.id in self.canvas.find_overlapping(x3, y3, x4, y4):
             self.micek.odrazX()
         self.after(10, self.udelej_krok)
+
+        if self.palka_2.score > 2:      #počítaní scoré a následné vyhlášení vítěze
+            self.palka_2.x = 100000
+            self.palka.x = 100000
+            self.micek.rychlost = None
+            self.win_text = self.canvas.create_text(self.W/2, 60, text="hráč číslo dvě vyhrál", font="Arial 20 bold")
+
+        if self.palka.score > 2:      #počítaní scoré a následné vyhlášení vítěze
+            self.palka_2.x = 100000
+            self.palka.x = 100000
+            self.micek.rychlost = None
+            self.win_text = self.canvas.create_text(self.W/2, 60, text="hráč číslo jedna vyhrál", font="Arial 20 bold")
+
+
         ######################################
 
     def palka_up(self, udalost):
@@ -280,11 +324,32 @@ class App(tk.Tk):
     def palka_stop2(self, udalost):
         self.palka_2.set_rychlost([0, 0])
 
+    def won_title_1(self):
+        self.nadpis = tk.Label(self.skupinaHorni, text="kdo první l", background="red",
+                               foreground="yellow",
+                               font="Arial 15 bold")
+        self.nadpis.pack(fill=tk.BOTH, side=tk.TOP)
+        #self.nadpis = tk.Label(self.skupinaHorni, text="Vyhrál číslo 2", background="red",
+                              # foreground=yellow,
+                             #  font=Arial 15 bold)
+
+
+    def won_title_2(self):
+
+        self.nadpis = tk.Label(self.skupinaHorni, text="kdo první l", background="red",
+                               foreground="yellow",
+                               font="Arial 15 bold")
+        self.nadpis.pack(fill=tk.BOTH, side=tk.TOP)
+
+
+
+
     ############
     def klik_pravym(self, udalost):
         """
            výpis souřadnic na canvase při kliknutí na canvas pravým myším tlačítkem
         """
+
         self.canvas.itemconfig(self.napis, text=f"{udalost.x},{udalost.y}")
 
     ############
